@@ -1,0 +1,94 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scicat-backend
+  namespace: scicat
+spec:
+  selector:
+    matchLabels:
+      k8s-app: backend-scicat
+  template:
+    metadata:
+      labels:
+        k8s-app: backend-scicat
+        network-policy-ingress-allowed: "true"
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/scicatproject/backend-next:latest
+          imagePullPolicy: Always
+          env:
+            # Mongo config
+            - name: MONGODB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: mongouser
+                  optional: false
+            - name: MONGODB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: mongopassword
+                  optional: false
+            - name: MONGODB_URI
+              value: "mongodb://$(MONGODB_USERNAME):$(MONGODB_PASSWORD)@mongodb:27017/scicat?authSource=admin"
+            # OIDC config
+            - name: OIDC_ISSUER
+              value: https://keycloak.example.com/realms/your-realm
+            - name: OIDC_CLIENT_ID
+              value: some-oidc-client
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: oidc-client-secret
+                  optional: false
+            - name: OIDC_CALLBACK_URL
+              value: https://scicat.example.com/api/v3/auth/oidc/callback
+            - name: OIDC_SCOPE
+              value: email profile openid
+            - name: OIDC_SUCCESS_URL
+              value: https://scicat.example.com/user
+            - name: OIDC_ACCESS_GROUPS
+              value: roles
+            # Session config
+            - name: EXPRESS_SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: express-session-secret
+                  optional: false
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: jwt-secret
+                  optional: false
+            # Port
+            - name: PORT
+              value: "3000"
+          securityContext:
+            capabilities:
+              drop:
+              - ALL
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - containerPort: 3000
+              name: backend
+          volumeMounts:
+          - name: functional-accounts
+            mountPath: /home/node/app/functionalAccounts.json
+            subPath: functionalAccounts.json
+            readOnly: true
+      volumes:
+        - name: functional-accounts
+          secret:
+            secretName: functional-accounts

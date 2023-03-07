@@ -1,0 +1,91 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-ingress-outside-namespace
+  namespace: scicat
+spec:
+  podSelector:
+    matchLabels:
+  policyTypes:
+    - Ingress
+  ingress:
+  # Allow ingress from pods in current namespace
+  - from:
+    - podSelector: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-controller
+  namespace: scicat
+spec:
+  podSelector:
+    matchLabels:
+      network-policy-ingress-allowed: "true"
+  policyTypes:
+    - Ingress
+  ingress:
+  # Allow ingress from ingress-nginx controller
+  - from:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: ingress
+        podSelector:
+          matchLabels:
+            app.kubernetes.io/name: ingress-nginx
+            app.kubernetes.io/component: controller
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: allow-ingress-from-linkerd
+spec:
+  podSelector: {}
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          linkerd.io/control-plane-ns: linkerd
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: limit-egress
+spec:
+  podSelector:
+    matchLabels:
+  policyTypes:
+  - Egress
+  egress:
+  # allow namespace-internal comms
+  - to:
+    - podSelector:
+        matchLabels:
+  # allow linkerd comms
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          linkerd.io/control-plane-ns: linkerd
+  # allow DNS resolution
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+      - port: 53
+        protocol: UDP
+      - port: 53
+        protocol: TCP
+  # allow egress to internet, but not k8s network or openstack private network
+  - to:
+    - ipBlock:
+        # allow all IPs
+        cidr: 0.0.0.0/0
+        except:
+          # except the private IP ranges: https://en.wikipedia.org/wiki/Private_network
+          - 10.0.0.0/8
+          - 192.168.0.0/16
+          - 172.16.0.0/20

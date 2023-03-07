@@ -1,0 +1,56 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scicat-frontend
+  namespace: scicat
+spec:
+  selector:
+    matchLabels:
+      k8s-app: frontend-scicat
+  template:
+    metadata:
+      labels:
+        k8s-app: frontend-scicat
+        network-policy-ingress-allowed: "true"
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/scicatproject/frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+              name: frontend
+          volumeMounts:
+          - name: config-volume
+            mountPath: /usr/share/nginx/html/assets/config.json
+            subPath: config.json
+          - name: cache
+            mountPath: /var/cache/nginx
+          - name: tmp
+            mountPath: /tmp/nginx
+          - name: run
+            mountPath: /run
+          securityContext:
+            capabilities:
+              drop:
+              - ALL
+              add:
+              - CHOWN
+              - NET_BIND_SERVICE  # needed to bind to port 80
+              - SETGID
+              - SETUID
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+      volumes:
+        - name: config-volume
+          configMap:
+            name: frontend-config
+        - name: cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: run
+          emptyDir: {}

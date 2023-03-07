@@ -1,0 +1,14 @@
+---
+  apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: mongodb-pvc
+    namespace: scicat
+    labels:
+      k8s-app: mongodb-scicat
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 10Gi
